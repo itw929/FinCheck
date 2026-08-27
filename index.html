@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FinCheck — check what a money video actually told you</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Public+Sans:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;1,6..72,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ------------------------------------------------------------
+   Tokens. Dark, because that is the direction already set by
+   the deck. Not black-plus-one-acid-accent: the four axes need
+   four legible states, so the palette is built around the band
+   scale and everything structural is the one violet.
+   ------------------------------------------------------------ */
+:root{
+  --ink:#101219; --surface:#171A23; --surface-2:#1E222D; --line:#2A2F3D;
+  --text:#E6E8F0; --muted:#868DA3; --dim:#5B6278;
+  --pass:#56D6A0; --warn:#E8A33D; --fail:#EE7B52; --critical:#E8455F; --neutral:#6E7793;
+  --accent:#7C6BF0;
+  --display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --ui:"Public Sans",ui-sans-serif,system-ui,-apple-system,sans-serif;
+  --serif:"Newsreader",Georgia,"Times New Roman",serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --r:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--ink);color:var(--text);font-family:var(--ui);font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+.wrap{max-width:660px;margin:0 auto;padding:28px 18px 96px}
+
+/* ---------- masthead ---------- */
+.mast{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
+.mark{font-family:var(--display);font-weight:700;font-size:26px;letter-spacing:-.02em}
+.mark span{color:var(--accent)}
+.tag{color:var(--muted);font-size:13px}
+.lede{color:var(--muted);font-size:14.5px;max-width:46ch;margin:0 0 22px}
+
+/* ---------- input ---------- */
+form{display:flex;gap:8px;margin-bottom:12px}
+input{flex:1;min-width:0;background:var(--surface);border:1px solid var(--line);color:var(--text);
+  border-radius:var(--r);padding:13px 14px;font:inherit;font-size:15px}
+input::placeholder{color:var(--dim)}
+input:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button{background:var(--accent);border:0;color:#fff;border-radius:var(--r);padding:13px 18px;
+  font:inherit;font-weight:600;cursor:pointer}
+button:hover{filter:brightness(1.08)}
+.demos{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:34px}
+.demos b{color:var(--dim);font-size:12px;font-weight:500;align-self:center;margin-right:2px;
+  text-transform:uppercase;letter-spacing:.09em}
+.chip{background:var(--surface);border:1px solid var(--line);color:var(--muted);border-radius:99px;
+  padding:5px 11px;font-size:12.5px;cursor:pointer;font-family:inherit}
+.chip:hover{border-color:var(--accent);color:var(--text)}
+
+/* ---------- verdict header ---------- */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.head{padding:22px 20px 18px;border-bottom:1px solid var(--line);position:relative}
+.head::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--bandc)}
+.vidmeta{font-size:12.5px;color:var(--dim);font-family:var(--mono);margin-bottom:12px}
+.scorerow{display:flex;align-items:flex-start;gap:16px}
+.score{font-family:var(--display);font-weight:700;font-size:64px;line-height:.86;
+  letter-spacing:-.045em;color:var(--bandc);font-variant-numeric:tabular-nums}
+.score small{font-size:20px;color:var(--dim);letter-spacing:0}
+.bandlab{font-family:var(--display);font-weight:600;font-size:20px;letter-spacing:-.015em;margin:2px 0 3px}
+.bandsub{color:var(--muted);font-size:14px}
+.title{font-size:15.5px;font-weight:600;margin:16px 0 0;line-height:1.35}
+
+/* ---------- axes ---------- */
+.axes{padding:18px 20px;border-bottom:1px solid var(--line)}
+.axis{display:grid;grid-template-columns:1fr auto;gap:2px 10px;margin-bottom:13px}
+.axis:last-child{margin-bottom:0}
+.axname{font-size:13.5px;color:var(--muted)}
+.axval{font-family:var(--mono);font-size:13px;color:var(--text);font-variant-numeric:tabular-nums}
+.bar{grid-column:1/-1;height:5px;background:var(--surface-2);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--c);border-radius:3px;width:0;
+  transition:width .7s cubic-bezier(.2,.7,.3,1)}
+.axis.binds .axname{color:var(--text);font-weight:600}
+.axis.binds .axname::after{content:"sets the score";font-weight:500;font-size:11px;color:var(--accent);
+  margin-left:8px;letter-spacing:.03em;text-transform:uppercase}
+.axis.na .axval{color:var(--dim)}
+
+/* ---------- caps / notices ---------- */
+.notice{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;gap:11px;font-size:13.5px;line-height:1.45}
+.notice .k{font-family:var(--mono);font-size:11px;color:var(--ink);background:var(--critical);
+  border-radius:4px;padding:2px 6px;height:fit-content;white-space:nowrap;font-weight:500}
+.notice.soft .k{background:var(--neutral);color:var(--text)}
+.notice p{margin:0;color:var(--muted)}
+
+/* ---------- claims ---------- */
+.claims{padding:4px 0}
+.claim{padding:20px;border-bottom:1px solid var(--line)}
+.claim:last-child{border-bottom:0}
+.crow{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.ts{font-family:var(--mono);font-size:13px;color:var(--dim)}
+.pill{margin-left:auto;font-size:12.5px;font-weight:500;padding:4px 11px;border-radius:7px;
+  color:var(--pc);background:color-mix(in srgb,var(--pc) 16%,transparent)}
+@supports not (color:color-mix(in srgb,red 10%,transparent)){.pill{background:var(--surface-2)}}
+
+/* the signature: two sentences, side by side, typographically
+   distinct. The video speaks in the interface's own voice; the
+   source speaks in a serif, because the authority is not ours. */
+.said{margin-bottom:16px}
+.said h4{margin:0 0 8px;font-size:14px;font-weight:400;color:var(--muted);letter-spacing:0}
+.said blockquote{margin:0;padding-left:14px;border-left:2px solid var(--bl);font-size:16px;line-height:1.5}
+.said.src blockquote{font-family:var(--serif);font-size:17.5px;line-height:1.45;color:#F2F4FA}
+.said.src.para blockquote{border-left-style:dashed;font-style:italic;font-size:16px;color:var(--text)}
+.badge{display:flex;align-items:center;gap:9px;margin-top:11px;padding-left:16px;
+  font-size:13px;color:var(--muted);flex-wrap:wrap}
+.badge .tick{color:var(--bd);font-size:13px;line-height:1}
+.badge .lab{color:var(--bd)}
+.badge a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(124,107,240,.35)}
+.badge a:hover{border-bottom-color:var(--accent)}
+.tier{font-family:var(--mono);font-size:10.5px;color:var(--accent);border:1px solid rgba(124,107,240,.4);
+  border-radius:4px;padding:1px 5px}
+
+/* register card — deliberately not a quote block */
+.reg{border:1px solid var(--line);border-radius:var(--r);padding:14px;background:var(--surface-2)}
+.reg .who{font-family:var(--mono);font-size:13px;margin-bottom:8px;color:var(--text)}
+.reg .find{font-size:14.5px;line-height:1.45;margin:0 0 9px}
+.reg .meta{font-size:11.5px;color:var(--dim);font-family:var(--mono)}
+.reg.bad{border-color:rgba(232,69,95,.45)}
+.reg.ok{border-color:rgba(86,214,160,.4)}
+
+.why{font-size:14.5px;color:var(--muted);line-height:1.55;margin:0 0 14px}
+.temporal{font-size:13px;color:var(--warn);background:rgba(232,163,61,.08);
+  border:1px solid rgba(232,163,61,.22);border-radius:var(--r);padding:9px 12px;margin-bottom:14px}
+.sect{margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+.sect h5{margin:0 0 10px;font-size:14px;font-weight:400;color:var(--muted);letter-spacing:0}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.miss{background:var(--surface-2);border:1px solid var(--line);border-radius:7px;
+  padding:7px 12px;font-size:13.5px;color:var(--text)}
+.miss.minor{opacity:.66}
+.flag{display:flex;gap:9px;align-items:flex-start;font-size:13.5px;margin-bottom:7px}
+.flag b{color:var(--text);font-weight:600;white-space:nowrap}
+.flag i{font-style:normal;color:var(--muted)}
+.flag .fd{width:5px;height:5px;border-radius:99px;margin-top:8px;flex:none;background:var(--fail)}
+
+/* ---------- aside + workings ---------- */
+.foot{padding:18px 20px;border-top:1px solid var(--line)}
+.foot h5{margin:0 0 9px;font-size:11px;font-weight:600;color:var(--dim);
+  text-transform:uppercase;letter-spacing:.1em}
+.aside{font-size:13.5px;color:var(--muted);margin-bottom:6px;display:flex;gap:10px}
+details{margin-top:14px}
+summary{cursor:pointer;font-size:13px;color:var(--muted);list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"› ";color:var(--accent)}
+details[open] summary::before{content:"⌄ "}
+.workings{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:10px;
+  background:var(--ink);border:1px solid var(--line);border-radius:var(--r);padding:12px;
+  overflow-x:auto;white-space:pre;line-height:1.7}
+.rule{font-size:13px;color:var(--muted);margin:10px 0 0;line-height:1.55;font-family:var(--ui)}
+
+.empty{padding:34px 20px;text-align:center}
+.empty h3{font-family:var(--display);font-weight:600;font-size:19px;margin:0 0 8px}
+.empty p{color:var(--muted);font-size:14px;margin:0 auto;max-width:40ch}
+
+.legal{margin-top:26px;font-size:12px;color:var(--dim);line-height:1.6}
+
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+@media (max-width:420px){.score{font-size:52px}.wrap{padding:22px 14px 80px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="mast">
+    <div class="mark">Fin<span>Check</span></div>
+    <div class="tag">UK · sources you can open</div>
+  </div>
+  <p class="lede">Paste a link to a money video. We read what was said, check each claim
+     against the regulator, and show you the source next to the claim so you can decide for yourself.</p>
+
+  <form id="f">
+    <input id="u" type="url" inputmode="url" autocomplete="off" spellcheck="false"
+           placeholder="Paste a TikTok, Reel or Shorts link" aria-label="Video link">
+    <button type="submit">Check</button>
+  </form>
+  <div class="demos" id="demos"><b>Try</b></div>
+
+  <div id="out"></div>
+
+  <p class="legal">FinCheck is an educational tool. It does not give financial advice and does not
+     recommend products. Register findings state what the FCA Financial Services Register showed on
+     the date checked.</p>
+</div>
+
+<script src="engine.js"></script>
+<script src="analyses.js"></script>
+<script>
+(function(){
+  var E = window.FinCheckEngine;
+  var BY = {};
+  ANALYSES.forEach(function(r){ if(r.urlKey) BY[r.urlKey] = r; });
+
+  var BAND = {pass:"var(--pass)",warn:"var(--warn)",fail:"var(--fail)",
+              critical:"var(--critical)",neutral:"var(--neutral)"};
+
+  function esc(s){ return String(s==null?"":s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+  function el(html){ var d=document.createElement("div"); d.innerHTML=html.trim(); return d.firstChild; }
+
+  /* ---- demo chips ---- */
+  var demos = document.getElementById("demos");
+  ANALYSES.forEach(function(r){
+    var b = el('<button class="chip" type="button"></button>');
+    b.textContent = r.title.length>34 ? r.title.slice(0,33)+"…" : r.title;
+    b.onclick = function(){ document.getElementById("u").value = r.url; show(r.url); };
+    demos.appendChild(b);
+  });
+
+  document.getElementById("f").onsubmit = function(e){
+    e.preventDefault(); show(document.getElementById("u").value);
+  };
+
+  function show(url){
+    var out = document.getElementById("out");
+    var n = E.normaliseUrl(url);
+
+    if(!n.key){
+      out.innerHTML = '<div class="card"><div class="empty"><h3>That does not look like a video link</h3>'
+        + '<p>FinCheck reads TikTok, Instagram Reels and YouTube Shorts links. Paste the share link from the app.</p></div></div>';
+      return;
+    }
+    var rec = BY[n.key];
+    if(!rec){
+      out.innerHTML = '<div class="card"><div class="empty"><h3>Not in the cache yet</h3>'
+        + '<p>These eight videos were analysed in advance so the demo does not depend on the wifi. '
+        + 'Live checking runs the same pipeline and takes about forty seconds.</p></div></div>';
+      return;
+    }
+    out.innerHTML = "";
+    out.appendChild(render(E.scoreVideo(rec)));
+    requestAnimationFrame(function(){
+      out.querySelectorAll(".bar i").forEach(function(i){ i.style.width = i.dataset.w + "%"; });
+    });
+  }
+
+  /* ================= rendering ================= */
+
+  function render(r){
+    var c = BAND[r.band.level] || BAND.neutral;
+    var card = el('<div class="card"></div>');
+    card.style.setProperty("--bandc", c);
+
+    card.appendChild(head(r, c));
+    if(r.state === "scored") card.appendChild(axes(r));
+    (r.caps||[]).forEach(function(cap){ card.appendChild(notice(cap)); });
+
+    var wrapC = el('<div class="claims"></div>');
+    (r.claims||[]).forEach(function(cl){ wrapC.appendChild(claim(cl)); });
+    if(wrapC.children.length) card.appendChild(wrapC);
+
+    card.appendChild(foot(r));
+    return card;
+  }
+
+  function head(r, c){
+    var v = r.video;
+    var h = el('<div class="head"></div>');
+    h.innerHTML =
+      '<div class="vidmeta">' + esc(v.platform||"") + ' · ' + esc(v.creator||"unknown")
+        + (v.publishedAt ? ' · posted ' + esc(v.publishedAt) : '') + '</div>'
+      + '<div class="scorerow">'
+        + (r.state === "scored"
+            ? '<div class="score">' + r.score + '<small>/100</small></div>'
+            : '')
+        + '<div><div class="bandlab">' + esc(r.band.label) + '</div>'
+             + '<div class="bandsub">' + esc(r.band.sub) + '</div></div>'
+      + '</div>'
+      + (v.title ? '<p class="title">' + esc(v.title) + '</p>' : '');
+    h.querySelector(".bandlab").style.color = c;
+    return h;
+  }
+
+  function axes(r){
+    var box = el('<div class="axes"></div>');
+    E.AXES.forEach(function(a){
+      var val = r.axes[a.key];
+      var binds = a.key === r.bindingAxis;
+      var row = el('<div class="axis' + (binds ? ' binds' : '')
+        + (val === null ? ' na' : '') + '"></div>');
+      row.innerHTML =
+        '<div class="axname">' + esc(a.label) + '</div>'
+        + '<div class="axval">' + (val === null ? 'not assessed' : val) + '</div>'
+        + '<div class="bar"><i data-w="' + (val === null ? 0 : val) + '"></i></div>';
+      row.querySelector(".bar i").style.setProperty("--c",
+        val === null ? "var(--neutral)"
+        : val >= 85 ? "var(--pass)" : val >= 60 ? "var(--warn)"
+        : val >= 30 ? "var(--fail)" : "var(--critical)");
+      box.appendChild(row);
+    });
+    return box;
+  }
+
+  function notice(cap){
+    var soft = cap.cap >= 60;
+    var n = el('<div class="notice' + (soft ? ' soft' : '') + '"></div>');
+    n.innerHTML = '<span class="k">caps at ' + cap.cap + '</span><p>' + esc(cap.reason) + '</p>';
+    return n;
+  }
+
+  function claim(cl){
+    var pc = BAND[cl.verdictMeta.band] || BAND.neutral;
+    var box = el('<div class="claim"></div>');
+
+    var row = el('<div class="crow"></div>');
+    row.innerHTML = '<span class="ts">' + esc(cl.timestamp || "—") + '</span>'
+      + '<span class="pill">' + esc(cl.verdictMeta.label) + '</span>';
+    row.querySelector(".pill").style.setProperty("--pc", pc);
+    box.appendChild(row);
+
+    /* what the video said */
+    var said = el('<div class="said"><h4>The video said</h4><blockquote></blockquote></div>');
+    said.style.setProperty("--bl", pc);
+    said.querySelector("blockquote").textContent = cl.text || "";
+    box.appendChild(said);
+
+    /* what the source says — four honest states */
+    box.appendChild(sourceBlock(cl));
+
+    if(cl.explanation) box.appendChild(el('<p class="why">' + esc(cl.explanation) + '</p>'));
+
+    if(cl.temporalNote && cl.temporalNote.kind === "changed"){
+      box.appendChild(el('<div class="temporal">' + esc(cl.temporalNote.text) + '</div>'));
+    }
+
+    if((cl.missing||[]).length){
+      var s = el('<div class="sect"><h5>Also not mentioned</h5><div class="chips"></div></div>');
+      var chips = s.querySelector(".chips");
+      cl.missing.forEach(function(m){
+        var t = el('<span class="miss' + (m.materiality === "minor" ? " minor" : "") + '"></span>');
+        t.textContent = m.text; chips.appendChild(t);
+      });
+      box.appendChild(s);
+    }
+
+    if((cl.flagsMeta||[]).length){
+      var f = el('<div class="sect"><h5>Flags</h5></div>');
+      cl.flagsMeta.forEach(function(fm){
+        var line = el('<div class="flag"><span class="fd"></span><span><b></b> <i></i></span></div>');
+        line.querySelector("b").textContent = fm.label;
+        line.querySelector("i").textContent = "— " + fm.detail;
+        f.appendChild(line);
+      });
+      box.appendChild(f);
+    }
+    return box;
+  }
+
+  function sourceBlock(cl){
+    var s = cl.source || {};
+    var state = cl.sourceState;
+
+    if(state === "register_check"){
+      var rc = s.registerCheck || {};
+      var bad = rc.state === "not_found" || rc.state === "similar_names_only" || rc.state === "on_warning_list";
+      var box = el('<div class="said"><h4>FCA register check</h4>'
+        + '<div class="reg ' + (bad ? "bad" : rc.state === "authorised" ? "ok" : "") + '">'
+        + '<div class="who"></div><p class="find"></p><div class="meta"></div></div></div>');
+      box.querySelector(".who").textContent = 'Searched: "' + (rc.firmSearched || "—") + '"';
+      box.querySelector(".find").textContent = rc.statement || "Not checked.";
+      box.querySelector(".meta").textContent = "Direct lookup, not a model output · checked " + (rc.checkedAt || "—");
+      return box;
+    }
+
+    if(state === "no_source_found"){
+      var nb = el('<div class="said"><h4>What the sources say</h4>'
+        + '<div class="reg"><p class="find">No trusted source settles this either way. '
+        + 'That is a statement about our sources, not proof the claim is false.</p></div></div>');
+      return nb;
+    }
+
+    var para = state === "paraphrase";
+    var b = el('<div class="said src' + (para ? " para" : "") + '">'
+      + '<h4>' + esc(s.name || "The source") + ' says</h4><blockquote></blockquote></div>');
+    b.style.setProperty("--bl", para ? "var(--neutral)" : "var(--accent)");
+    b.querySelector("blockquote").textContent = para ? (s.paraphrase || "") : (s.quote || "");
+
+    var badge = el('<div class="badge"><span class="tick"></span><span class="lab"></span></div>');
+    badge.style.setProperty("--bd", para ? "var(--neutral)" : "var(--pass)");
+    badge.querySelector(".tick").textContent = para ? "◇" : "✓";
+    badge.querySelector(".lab").textContent =
+      para ? "Summarised from the page, not a quotation" : "Verbatim, verified against source";
+    if(s.textFragmentUrl){
+      var a = el('<a target="_blank" rel="noopener noreferrer"></a>');
+      a.href = s.textFragmentUrl;
+      a.textContent = (para ? "Open the page" : "Jump to this line") + " ↗";
+      badge.appendChild(a);
+    }
+    if(s.tier) badge.appendChild(el('<span class="tier">Tier ' + s.tier + '</span>'));
+    badge.appendChild(el('<span style="color:var(--dim)">' + esc(cl.confidence) + ' confidence</span>'));
+    b.appendChild(badge);
+    return b;
+  }
+
+  function foot(r){
+    var f = el('<div class="foot"></div>');
+
+    if((r.setAside||[]).length){
+      var sa = el('<div><h5>Set aside, not scored</h5></div>');
+      r.setAside.forEach(function(x){
+        var d = el('<div class="aside"><span class="ts"></span><span></span></div>');
+        d.querySelector(".ts").textContent = x.timestamp || "—";
+        d.querySelector("span:last-child").textContent = (x.text ? '"' + x.text + '" — ' : "") + x.reason;
+        sa.appendChild(d);
+      });
+      f.appendChild(sa);
+    }
+
+    if(r.state === "scored"){
+      var d = el('<details><summary>Show the working</summary></details>');
+      var lines = [];
+      E.AXES.forEach(function(a){
+        var w = r.workings.perAxis[a.key].workings;
+        lines.push(a.label.padEnd(24) + (r.axes[a.key] === null ? "not assessed"
+          : String(r.axes[a.key]).padStart(3) + "   worst claim −" + w.worstClaimDeduction
+            + " (" + w.worstClaimId + "), others −" + w.otherClaimsDeduction));
+      });
+      lines.push("");
+      lines.push("lowest axis".padEnd(24) + String(r.workings.preCapScore).padStart(3)
+        + "   " + r.bindingAxisLabel);
+      (r.caps||[]).forEach(function(c){ lines.push("cap".padEnd(24) + String(c.cap).padStart(3)); });
+      lines.push("headline".padEnd(24) + String(r.score).padStart(3));
+      lines.push("");
+      lines.push("checked " + Math.round(r.coverage*100) + "% of claims against a trusted source");
+
+      d.appendChild(el('<div class="workings">' + esc(lines.join("\n")) + '</div>'));
+      d.appendChild(el('<p class="rule">' + esc(r.workings.rule) + '</p>'));
+      f.appendChild(d);
+    }
+    return f;
+  }
+
+  /* Open on the pitch video so the stage demo needs no typing. */
+  if(ANALYSES.length) show(ANALYSES[2] ? ANALYSES[2].url : ANALYSES[0].url);
+})();
+</script>
+</body>
+</html>
