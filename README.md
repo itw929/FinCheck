@@ -2,10 +2,6 @@
 
 Link any finance or economics video. Each claim in the video will be checked against trusted sources, and a final score is given based on the quality and reliability of the information. 
 
-No AI decides whether a claim is true. The model reads, retrieves and labels.
-Every number on screen is calculated by `engine.js` from those labels, in code
-you can read.
-
 ---
 
 ## 1. Put the files in a repo
